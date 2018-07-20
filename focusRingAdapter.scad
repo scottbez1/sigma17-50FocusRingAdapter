@@ -39,10 +39,15 @@ module ring(angle) {
     }
 }
 
-module gt2_sprocket_arc(teeth, radius, center=true) {
-    PLD = 0.254;
-    h = 0.75;
-    tooth_radius = 0.555;
+GT2_PLD = 0.254;
+GT2_h = 0.75;
+GT2_H = 1.38;
+GT2_width = 6;
+
+module gt2_sprocket_arc(teeth, radius, slop_factor, center=true) {
+    PLD = GT2_PLD * slop_factor;
+    h = GT2_h * slop_factor;
+    tooth_radius = 0.555 * slop_factor;
     pitch = 2;
     pitch_arc_length = teeth * pitch;
     angle = 360 * pitch_arc_length / (2 * PI * radius);
@@ -89,11 +94,61 @@ module gt2_sprocket_arc(teeth, radius, center=true) {
 
 ring_teeth = 30;
 ring_angle = 360 * ring_teeth / focus_ring_teeth;
-linear_extrude(2.5) {
-    intersection() {
-        rotate([0, 0, -ring_angle/2]) {
-            ring(ring_angle);
+base_height = 1.2;
+
+linear_extrude(base_height) {
+    rotate([0, 0, -ring_angle/2]) {
+        difference(){
+            wedge(r=retaining_wall_outer_radius, angle=ring_angle, $fn=60);
+            wedge(r=tooth_inner_radius + radius_bias, angle=ring_angle, $fn=60);
         }
-        gt2_sprocket_arc(50, adapter_outer_radius);
+    }
+}
+
+height = GT2_width + 0.2;
+translate([0, 0, base_height - eps]) {
+    linear_extrude(height) {
+        intersection() {
+            rotate([0, 0, -ring_angle/2]) {
+                ring(ring_angle);
+            }
+            gt2_sprocket_arc(50, adapter_outer_radius, 1.4);
+        }
+    }
+}
+
+// Retaining wall:
+retaining_wall_thickness = 1.5;
+retaining_wall_inner_radius = adapter_outer_radius + GT2_H - GT2_PLD - GT2_h + 0.12;
+retaining_wall_outer_radius = retaining_wall_inner_radius + retaining_wall_thickness;
+overhang = 0.15;
+overhang_height = 0.4;
+
+linear_extrude(height + base_height) {
+    rotate([0, 0, -ring_angle/2]) {
+        difference(){
+            wedge(r=retaining_wall_outer_radius, angle=ring_angle, $fn=60);
+            wedge(r=retaining_wall_inner_radius, angle=ring_angle, $fn=60);
+        }
+    }
+}
+
+translate([0, 0, base_height + height -eps]) {
+    rotate([0, 0, -ring_angle/2]) {
+        intersection() {
+            linear_extrude(overhang_height) {
+                wedge(r=retaining_wall_outer_radius, angle=ring_angle, $fn=60);
+            }
+            rotate_extrude($fn=120) {
+                translate([retaining_wall_inner_radius, 0, 0]) {
+                    polygon([
+                        [0, 0],
+                        [retaining_wall_thickness + 5, 0],
+                        [retaining_wall_thickness + 5, overhang_height],
+                        [-overhang, overhang_height]
+                    ]);
+                }
+            }
+        }
     }
 }
